@@ -1,0 +1,7 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  benchmark:
+    build: .
+    command: python benchmark.py
