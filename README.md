@@ -1,5 +1,4 @@
 # Monte Carlo Pi Benchmark
-
 This script benchmarks the calculation of Pi using the Monte Carlo method with multiprocessing.
 
 ## Prerequisites
@@ -36,6 +35,45 @@ Replace `<WSL2_IP_Address>` with the IP address of your WSL2 instance. You can f
 
 ```sh
 hostname -I
+```
+
+## Configuring Port Forwarding
+
+To allow access to the web server from other devices on your LAN, you need to set up port forwarding from your Windows host to the WSL2 instance.
+
+### Determine the WSL2 IP Address
+
+In your WSL2 terminal, run:
+
+```sh
+ip addr show eth0
+```
+
+Note the `inet` address under `eth0`.
+
+### Set Up Port Forwarding
+
+Open PowerShell as Administrator and run the following command, replacing `<WSL2_IP_ADDRESS>` with the IP address you noted:
+
+```powershell
+netsh interface portproxy add v4tov4 listenport=8000 listenaddress=0.0.0.0 connectport=8000 connectaddress=<WSL2_IP_ADDRESS>
+```
+
+### Verify the Port Forwarding Rules
+
+To verify that the port forwarding rule has been added, run:
+
+```powershell
+netsh interface portproxy show all
+```
+
+You should see an entry similar to:
+
+```plaintext
+Listen on ipv4:             Connect to ipv4:
+Address         Port        Address         Port
+--------------- ----------  --------------- ----------
+0.0.0.0         8000        <WSL2_IP_ADDRESS> 8000
 ```
 
 ## Checking the Web Server
