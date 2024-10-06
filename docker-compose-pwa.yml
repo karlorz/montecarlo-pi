@@ -1,0 +1,12 @@
+# docker-compose-pwa.yml
+version: '3.8'
+
+services:
+  pwa-server:
+    build:
+      context: ./app/pwa
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app/pwa:/app

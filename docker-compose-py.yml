@@ -1,0 +1,11 @@
+# docker-compose-py.yml
+version: '3.8'
+
+services:
+  python-console:
+    build:
+      context: ./app/python
+      dockerfile: Dockerfile
+    command: python benchmark.py -mmt 4 -i 1 -ti 7
+    volumes:
+      - ./app/python:/app

@@ -85,3 +85,26 @@ http://localhost:8000
 ```
 
 You should see the contents of the directory you are serving.
+
+## Building the Docker Image
+
+To build the Docker image for the Python benchmark script, use the following command:
+
+```sh
+docker build -t python-benchmark:latest -f app/python/Dockerfile ./app/python
+```
+## Running the Benchmark
+
+To run the benchmark, use the following command:
+
+```sh
+docker run --rm -it python-benchmark:latest python benchmark.py -mmt <number_of_threads> -i <number_of_benchmark_iterations> -ti <iterations_as_power_of_10>
+```
+
+### Example Command
+
+For example, to use 4 threads, run 2 benchmark iterations, and set the number of iterations as 10^7:
+
+```sh
+docker run --rm -it python-benchmark:latest python benchmark.py -mmt 4 -i 2 -ti 7
+```

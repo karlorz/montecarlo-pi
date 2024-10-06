@@ -1,0 +1,11 @@
+# docker-compose-pwa-gpu.yml
+version: '3.8'
+services:
+  pwa-gpu-server:
+    build:
+      context: ./app/pwa-gpu
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./app/pwa-gpu:/app
