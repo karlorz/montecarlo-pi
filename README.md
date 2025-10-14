@@ -1,4 +1,19 @@
 # Monte Carlo Pi Benchmark
+
+This project benchmarks the calculation of Pi using the Monte Carlo method across multiple platforms.
+
+## 🌐 Live Demos (GitHub Pages)
+
+Try the benchmarks directly in your browser:
+
+- **PWA (Web Workers)**: https://karlorz.github.io/montecarlo-pi/app/pwa/
+- **PWA (WebGL GPU)**: https://karlorz.github.io/montecarlo-pi/app/pwa-gpu/
+- **PWA (WebAssembly)**: https://karlorz.github.io/montecarlo-pi/app/pwa-wasm/
+
+> **Note**: The WASM version is automatically built by GitHub Actions on each push. No compiled binaries are committed to the repository.
+
+## 📋 Overview
+
 This script benchmarks the calculation of Pi using the Monte Carlo method with multiprocessing.
 
 ## Prerequisites
@@ -108,3 +123,28 @@ For example, to use 4 threads, run 2 benchmark iterations, and set the number of
 ```sh
 docker run --rm -it python-benchmark:latest python benchmark.py -mmt 4 -i 2 -ti 7
 ```
+
+## 🚀 GitHub Pages Deployment
+
+This repository uses GitHub Actions to automatically build and deploy all web apps to GitHub Pages.
+
+### How It Works
+
+1. **Automatic Builds**: On every push to `main`, GitHub Actions:
+   - Builds the WebAssembly module from Rust source
+   - Deploys all web apps to GitHub Pages
+
+2. **Clean Repository**:
+   - No compiled binaries (`pkg/`) are committed
+   - Only source code is tracked in git
+   - Build artifacts are generated during CI/CD
+
+### Setup GitHub Pages
+
+To enable deployment in your fork:
+
+1. Go to **Settings** → **Pages**
+2. Under **Source**, select "GitHub Actions"
+3. Push to `main` branch to trigger deployment
+
+The workflow file is located at `.github/workflows/deploy.yml`.

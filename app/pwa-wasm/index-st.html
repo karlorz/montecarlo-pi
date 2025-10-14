@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monte Carlo Pi Benchmark - WebAssembly</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #results {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        #results.visible {
+            display: block;
+        }
+
+        #results h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        #results p {
+            margin: 8px 0;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        #results hr {
+            margin: 15px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+
+        .result-item {
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tech-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Monte Carlo Pi Benchmark<span class="tech-badge">WASM</span></h1>
+        <p class="subtitle">Powered by Rust + WebAssembly</p>
+
+        <div class="form-group">
+            <label for="iterations">Number of Iterations (Power of 10):</label>
+            <input type="number" id="iterations" min="1" max="8" value="7">
+        </div>
+
+        <div class="form-group">
+            <label for="benchmark-iterations">Benchmark Iterations:</label>
+            <input type="number" id="benchmark-iterations" min="1" max="100" value="2">
+        </div>
+
+        <button id="start-button">Start Benchmark</button>
+
+        <div id="loading" class="loading" style="display: none;">
+            Running benchmark...
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        import init, { calculate_pi, benchmark_pi, init_panic_hook } from './pkg/montecarlo_pi_wasm.js';
+
+        async function run() {
+            // Initialize the WASM module
+            await init();
+
+            // Set up panic hook for better error messages
+            init_panic_hook();
+
+            const startButton = document.getElementById('start-button');
+            const resultsDiv = document.getElementById('results');
+            const loadingDiv = document.getElementById('loading');
+
+            startButton.addEventListener('click', async () => {
+                const iterationsPower = parseInt(document.getElementById('iterations').value, 10);
+                const benchmarkIterations = parseInt(document.getElementById('benchmark-iterations').value, 10);
+                const totalIterations = Math.pow(10, iterationsPower);
+
+                resultsDiv.innerHTML = '';
+                resultsDiv.classList.remove('visible');
+                loadingDiv.style.display = 'block';
+                startButton.disabled = true;
+
+                // Add a small delay to allow UI to update
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                try {
+                    let totalPi = 0;
+                    let totalTime = 0;
+
+                    resultsDiv.innerHTML = '<h2>Benchmark Results</h2>';
+
+                    for (let run = 0; run < benchmarkIterations; run++) {
+                        const startTime = performance.now();
+
+                        // Call the WASM function
+                        const result = calculate_pi(totalIterations);
+                        const pi = result[0];
+                        const inCircle = result[1];
+                        const total = result[2];
+
+                        const elapsedTime = performance.now() - startTime;
+                        totalPi += pi;
+                        totalTime += elapsedTime;
+
+                        resultsDiv.innerHTML += `
+                            <div class="result-item">
+                                <p><strong>Run ${run + 1}:</strong></p>
+                                <p>Pi: ${pi}</p>
+                                <p>Points in circle: ${inCircle.toLocaleString()}</p>
+                                <p>Total points: ${total.toLocaleString()}</p>
+                                <p>Elapsed time: ${elapsedTime.toFixed(0)} ms</p>
+                                ${run < benchmarkIterations - 1 ? '<hr>' : ''}
+                            </div>
+                        `;
+                    }
+
+                    const avgPi = totalPi / benchmarkIterations;
+                    const avgTime = totalTime / benchmarkIterations;
+                    const error = Math.abs(Math.PI - avgPi);
+                    const errorPercent = (error / Math.PI * 100).toFixed(4);
+
+                    resultsDiv.innerHTML += `
+                        <hr>
+                        <div class="result-item">
+                            <h2>Average Results</h2>
+                            <p><strong>Average Pi:</strong> ${avgPi}</p>
+                            <p><strong>Actual Pi:</strong> ${Math.PI}</p>
+                            <p><strong>Error:</strong> ${error.toFixed(8)} (${errorPercent}%)</p>
+                            <p><strong>Average time:</strong> ${avgTime.toFixed(0)} ms</p>
+                            <p><strong>Total iterations per run:</strong> ${totalIterations.toLocaleString()}</p>
+                            <p><strong>Benchmark runs:</strong> ${benchmarkIterations}</p>
+                        </div>
+                    `;
+
+                    resultsDiv.classList.add('visible');
+                } catch (error) {
+                    resultsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                    resultsDiv.classList.add('visible');
+                    console.error('Benchmark error:', error);
+                } finally {
+                    loadingDiv.style.display = 'none';
+                    startButton.disabled = false;
+                }
+            });
+
+            console.log('WebAssembly module loaded successfully!');
+        }
+
+        run().catch(console.error);
+    </script>
+</body>
+</html>

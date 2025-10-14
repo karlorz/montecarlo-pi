@@ -1,0 +1,12 @@
+# docker-compose-pwa-wasm.yml
+version: '3.8'
+
+services:
+  pwa-wasm-server:
+    build:
+      context: ./app/pwa-wasm
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./app/pwa-wasm:/app

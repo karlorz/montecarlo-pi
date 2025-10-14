@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM Test</title>
+</head>
+<body>
+    <h1>Testing WASM Module</h1>
+    <button id="test">Run Test</button>
+    <pre id="output"></pre>
+
+    <script type="module">
+        import init, { calculate_pi, init_panic_hook } from './pkg/montecarlo_pi_wasm.js';
+
+        async function test() {
+            await init();
+            init_panic_hook();
+
+            const output = document.getElementById('output');
+            output.textContent = 'Testing with 10,000,000 iterations...\n';
+
+            try {
+                const result = calculate_pi(10000000);
+                output.textContent += `Success!\n`;
+                output.textContent += `Pi estimate: ${result[0]}\n`;
+                output.textContent += `Points in circle: ${result[1]}\n`;
+                output.textContent += `Total points: ${result[2]}\n`;
+                output.textContent += `Actual Pi: ${Math.PI}\n`;
+                output.textContent += `Error: ${Math.abs(Math.PI - result[0])}\n`;
+            } catch (error) {
+                output.textContent += `Error: ${error}\n`;
+                console.error(error);
+            }
+        }
+
+        document.getElementById('test').addEventListener('click', test);
+    </script>
+</body>
+</html>
