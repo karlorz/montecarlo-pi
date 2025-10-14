@@ -34,6 +34,9 @@ jobs:
           cd app/pwa-wasm
           wasm-pack build --target web --out-dir pkg
 
+      - name: Create .nojekyll
+        run: touch app/.nojekyll
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
