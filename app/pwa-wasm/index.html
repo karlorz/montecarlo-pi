@@ -166,7 +166,7 @@
 
         <div class="form-group">
             <label for="threads">Number of Threads:</label>
-            <input type="number" id="threads" min="1" max="16" value="4">
+            <input type="number" id="threads" min="1" max="16" value="6">
         </div>
 
         <div class="form-group">
@@ -189,6 +189,65 @@
     </div>
 
     <script type="module">
+        // Worker Pool for persistent WASM workers
+        class WorkerPool {
+            constructor(numThreads) {
+                this.numThreads = numThreads;
+                this.workers = [];
+                this.availableWorkers = [];
+                this.taskQueue = [];
+            }
+
+            async init() {
+                console.log(`Initializing worker pool with ${this.numThreads} workers...`);
+                const initPromises = [];
+
+                for (let i = 0; i < this.numThreads; i++) {
+                    const worker = new Worker('./wasm-worker.js', { type: 'module' });
+                    this.workers.push(worker);
+
+                    const readyPromise = new Promise((resolve) => {
+                        const readyHandler = (e) => {
+                            if (e.data.type === 'ready') {
+                                worker.removeEventListener('message', readyHandler);
+                                this.availableWorkers.push(worker);
+                                resolve();
+                            }
+                        };
+                        worker.addEventListener('message', readyHandler);
+                    });
+
+                    initPromises.push(readyPromise);
+                }
+
+                await Promise.all(initPromises);
+                console.log(`Worker pool initialized (${this.numThreads} workers ready)`);
+            }
+
+            execute(iters) {
+                return new Promise((resolve) => {
+                    const worker = this.availableWorkers.shift();
+
+                    const resultHandler = (e) => {
+                        if (e.data.type === 'result') {
+                            worker.removeEventListener('message', resultHandler);
+                            this.availableWorkers.push(worker);
+                            resolve(e.data.data);
+                        }
+                    };
+
+                    worker.addEventListener('message', resultHandler);
+                    worker.postMessage({ iters });
+                });
+            }
+
+            terminate() {
+                this.workers.forEach(w => w.terminate());
+                this.workers = [];
+                this.availableWorkers = [];
+            }
+        }
+
         async function run() {
             const startButton = document.getElementById('start-button');
             const resultsDiv = document.getElementById('results');
@@ -207,31 +266,25 @@
                 startButton.disabled = true;
 
                 try {
+                    // Create worker pool ONCE before benchmarking
+                    const pool = new WorkerPool(threads);
+                    const poolInitStart = performance.now();
+                    await pool.init();
+                    const poolInitTime = performance.now() - poolInitStart;
+
                     let totalPi = 0;
                     let totalTime = 0;
 
-                    resultsDiv.innerHTML = '<h2>Benchmark Results</h2>';
+                    resultsDiv.innerHTML = `<h2>Benchmark Results</h2>`;
+                    resultsDiv.innerHTML += `<p><strong>Worker pool initialization:</strong> ${poolInitTime.toFixed(0)} ms</p><hr>`;
 
                     for (let run = 0; run < benchmarkIterations; run++) {
                         const startTime = performance.now();
 
-                        // Spawn multiple workers, each running WASM
-                        const workers = [];
+                        // Reuse workers from pool - NO recreation overhead
                         const promises = [];
-
                         for (let t = 0; t < threads; t++) {
-                            const worker = new Worker('./wasm-worker.js', { type: 'module' });
-                            workers.push(worker);
-
-                            const promise = new Promise((resolve) => {
-                                worker.onmessage = (e) => {
-                                    resolve(e.data);
-                                    worker.terminate();
-                                };
-                            });
-
-                            worker.postMessage({ iters: itersPerThread });
-                            promises.push(promise);
+                            promises.push(pool.execute(itersPerThread));
                         }
 
                         // Wait for all workers to complete
@@ -257,6 +310,9 @@
                         `;
                     }
 
+                    // Cleanup - terminate all workers
+                    pool.terminate();
+
                     const avgPi = totalPi / benchmarkIterations;
                     const avgTime = totalTime / benchmarkIterations;
                     const error = Math.abs(Math.PI - avgPi);
@@ -270,6 +326,7 @@
                             <p><strong>Actual Pi:</strong> ${Math.PI}</p>
                             <p><strong>Error:</strong> ${error.toFixed(8)} (${errorPercent}%)</p>
                             <p><strong>Average time:</strong> ${avgTime.toFixed(0)} ms</p>
+                            <p><strong>Pool init time (one-time):</strong> ${poolInitTime.toFixed(0)} ms</p>
                             <p><strong>Threads:</strong> ${threads}</p>
                             <p><strong>Iterations per thread:</strong> ${itersPerThread.toLocaleString()}</p>
                             <p><strong>Total iterations per run:</strong> ${(itersPerThread * threads).toLocaleString()}</p>
@@ -287,7 +344,7 @@
                 }
             });
 
-            console.log('Multi-threaded WebAssembly ready!');
+            console.log('Multi-threaded WebAssembly ready (with worker pool)!');
         }
 
         run().catch(console.error);

@@ -11,8 +11,8 @@ then
     cargo install wasm-pack
 fi
 
-# Build the WASM module
-wasm-pack build --target web --out-dir pkg
+# Build the WASM module with release optimizations
+wasm-pack build --release --target web --out-dir pkg
 
 if [ $? -eq 0 ]; then
     echo "Build successful!"

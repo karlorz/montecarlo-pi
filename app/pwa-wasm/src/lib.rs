@@ -1,5 +1,4 @@
 use wasm_bindgen::prelude::*;
-use rand::Rng;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -13,32 +12,28 @@ extern "C" {
     fn log(s: &str);
 }
 
-/// Calculate Pi using Monte Carlo method
+/// Calculate Pi using Monte Carlo method with fastrand (WASM-native PRNG)
 ///
 /// # Arguments
 /// * `iterations` - Number of random points to generate (passed as f64 from JS)
 ///
 /// # Returns
-/// Tuple of (estimated_pi, points_in_circle, total_points)
+/// Estimated value of Pi
 #[wasm_bindgen]
-pub fn calculate_pi(iterations: f64) -> Vec<f64> {
+pub fn calculate_pi(iterations: f64) -> f64 {
     let iterations = iterations as u64;
-    let mut rng = rand::thread_rng();
     let mut count_inside = 0u64;
 
     for _ in 0..iterations {
-        let x: f64 = rng.gen();
-        let y: f64 = rng.gen();
+        let x = fastrand::f64();
+        let y = fastrand::f64();
 
         if x * x + y * y <= 1.0 {
             count_inside += 1;
         }
     }
 
-    let pi = 4.0 * (count_inside as f64) / (iterations as f64);
-
-    // Return as Vec since wasm-bindgen can convert this to JS array
-    vec![pi, count_inside as f64, iterations as f64]
+    4.0 * (count_inside as f64) / (iterations as f64)
 }
 
 /// Run benchmark with multiple iterations and return average
@@ -58,8 +53,7 @@ pub fn benchmark_pi(iterations: f64, benchmark_runs: f64) -> Vec<f64> {
     for run in 0..benchmark_runs {
         let start = js_sys::Date::now();
 
-        let result = calculate_pi(iterations);
-        let pi = result[0];
+        let pi = calculate_pi(iterations);
 
         let elapsed = js_sys::Date::now() - start;
 
