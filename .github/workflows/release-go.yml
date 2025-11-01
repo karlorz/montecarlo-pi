@@ -1,0 +1,83 @@
+name: Build and Release Go Binary
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write  # Required for creating releases
+
+jobs:
+  build-and-release:
+    name: Build Go Binary for Windows AMD64
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: benchmark-go/go.sum
+
+      - name: Build for Windows AMD64
+        env:
+          CGO_ENABLED: 0
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          cd benchmark-go
+          go build -ldflags="-s -w" -trimpath -o target/benchmark-go-windows-amd64.exe
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: benchmark-go/target/benchmark-go-windows-amd64.exe
+          body: |
+            ## Monte Carlo Pi Benchmark - Go Implementation
+
+            ### Windows AMD64 Binary
+
+            Download `benchmark-go-windows-amd64.exe` and run:
+
+            ```cmd
+            benchmark-go-windows-amd64.exe -mmt 6 -ti 7 -i 2
+            ```
+
+            **Default settings:**
+            - Threads: 6
+            - Iterations: 10^7
+            - Benchmark runs: 2
+
+            **Build information:**
+            - Version: ${{ steps.get_version.outputs.VERSION }}
+            - Go version: 1.21
+            - Target: windows/amd64
+            - Binary size: ~1.6MB (stripped)
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact for manual builds
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-go-windows-amd64
+          path: benchmark-go/target/benchmark-go-windows-amd64.exe
+          retention-days: 30

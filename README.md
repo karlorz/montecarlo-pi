@@ -192,6 +192,44 @@ To enable deployment in your fork:
 
 The workflow file is located at `.github/workflows/deploy.yml`.
 
+## 📦 Binary Releases
+
+### Windows AMD64 Binary
+
+Pre-built Windows AMD64 binaries are automatically built and released via GitHub Actions.
+
+#### Download
+
+Download the latest release from the [Releases page](https://github.com/karlorz/montecarlo-pi/releases).
+
+#### Usage
+
+```cmd
+# Download benchmark-go-windows-amd64.exe
+# Run with default settings (6 threads, 10^7 iterations, 2 runs)
+benchmark-go-windows-amd64.exe
+
+# Run with custom settings
+benchmark-go-windows-amd64.exe -mmt 8 -ti 9 -i 3
+```
+
+#### Creating a Release
+
+To create a new release with pre-built binaries:
+
+```bash
+# Tag a new version
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The GitHub Actions workflow will automatically:
+1. Build the Windows AMD64 binary
+2. Create a GitHub release
+3. Attach the binary to the release
+
+**Manual builds** can be triggered via the Actions tab → "Build and Release Go Binary" → "Run workflow".
+
 ## 🔍 Performance Analysis
 
 ### Problem: WASM was 20-50x slower than JavaScript
