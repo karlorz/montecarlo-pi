@@ -3,23 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monte Carlo Pi Benchmark with GPU</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Monte Carlo Pi Benchmark - WebGL vs WebGPU Comparison</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input {
+            width: 200px;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        #start-webgl {
+            background: #2196F3;
+            color: white;
+        }
+        #start-webgl:hover {
+            background: #1976D2;
+        }
+        #start-webgpu {
+            background: #4CAF50;
+            color: white;
+        }
+        #start-webgpu:hover {
+            background: #45a049;
+        }
+        #start-both {
+            background: #FF9800;
+            color: white;
+        }
+        #start-both:hover {
+            background: #F57C00;
+        }
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .result-panel {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+        }
+        .result-panel h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .webgl-panel {
+            border-color: #2196F3;
+        }
+        .webgl-panel h2 {
+            color: #2196F3;
+        }
+        .webgpu-panel {
+            border-color: #4CAF50;
+        }
+        .webgpu-panel h2 {
+            color: #4CAF50;
+        }
+        #results, #webgpu-results {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        #results p, #webgpu-results p {
+            margin: 8px 0;
+        }
+        hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 15px 0;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #1976D2;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <h1>Monte Carlo Pi Benchmark with GPU</h1>
+        <h1>🎯 Monte Carlo Pi Benchmark - WebGL vs WebGPU Comparison</h1>
+
+        <div class="info-box">
+            <h3>About This Test</h3>
+            <p><strong>WebGL (Fragment Shader):</strong> Uses traditional graphics API with fragment shaders - not optimized for compute workloads</p>
+            <p><strong>WebGPU (Compute Shader):</strong> Modern compute API with PCG random number generator and parallel workgroups</p>
+        </div>
+
         <div class="form-group">
             <label for="iterations">Number of Iterations (Power of 10):</label>
-            <input type="number" id="iterations" min="1" max="8" value="6">
+            <input type="number" id="iterations" min="1" value="7">
+            <span style="color: #666; margin-left: 10px;">Current: <span id="iterations-display">10,000,000</span></span>
+            <br>
+            <small style="color: #999;">✅ Multi-bucket implementation: Safe up to 10^10.94 (~87 billion iterations)</small>
         </div>
         <div class="form-group">
             <label for="benchmark-iterations">Benchmark Iterations:</label>
-            <input type="number" id="benchmark-iterations" min="1" max="100" value="2">
+            <input type="number" id="benchmark-iterations" min="1" max="100" value="3">
         </div>
-        <button id="start-button">Start Benchmark</button>
-        <div id="results"></div>
+
+        <div class="button-group">
+            <button id="start-webgl">▶ Run WebGL</button>
+            <button id="start-webgpu">▶ Run WebGPU</button>
+            <button id="start-both">▶▶ Run Both (Sequential)</button>
+        </div>
+
+        <div class="results-container">
+            <div class="result-panel webgl-panel">
+                <h2>🔵 WebGL Results</h2>
+                <div id="results"><p style="color: #999;">Click "Run WebGL" to start...</p></div>
+            </div>
+            <div class="result-panel webgpu-panel">
+                <h2>🟢 WebGPU Results</h2>
+                <div id="webgpu-results"><p style="color: #999;">Click "Run WebGPU" to start...</p></div>
+            </div>
+        </div>
     </div>
-    <script src="app.js"></script>
+
+    <script>
+        // Update iteration display
+        document.getElementById('iterations').addEventListener('input', (e) => {
+            const val = Math.pow(10, parseInt(e.target.value));
+            document.getElementById('iterations-display').textContent = val.toLocaleString();
+        });
+    </script>
+    <script src="app.js?v=7"></script>
+    <script src="app-webgpu.js?v=7"></script>
+    <script>
+        // Button handlers
+        document.getElementById('start-webgl').addEventListener('click', () => {
+            window.runWebGLBenchmark();
+        });
+
+        document.getElementById('start-webgpu').addEventListener('click', () => {
+            window.runWebGPUBenchmark();
+        });
+
+        document.getElementById('start-both').addEventListener('click', async () => {
+            document.getElementById('results').innerHTML = '<p>Running WebGL...</p>';
+            document.getElementById('webgpu-results').innerHTML = '<p>Waiting for WebGL to complete...</p>';
+
+            // Run WebGL first
+            window.runWebGLBenchmark();
+
+            // Wait a bit, then run WebGPU
+            setTimeout(async () => {
+                await window.runWebGPUBenchmark();
+            }, 2000);
+        });
+    </script>
 </body>
 </html>

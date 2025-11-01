@@ -1,4 +1,4 @@
-document.getElementById('start-button').addEventListener('click', () => {
+function runWebGLBenchmark() {
     const iterationsPower = parseInt(document.getElementById('iterations').value, 10);
     const totalIterations = Math.pow(10, iterationsPower);
     const benchmarkIterations = parseInt(document.getElementById('benchmark-iterations').value, 10);
@@ -14,8 +14,10 @@ document.getElementById('start-button').addEventListener('click', () => {
         if (b >= benchmarkIterations) {
             const avgPi = totalPi / benchmarkIterations;
             const avgTime = totalTime / benchmarkIterations;
-            resultsDiv.innerHTML += `<p>Average Pi: ${avgPi}</p>`;
-            resultsDiv.innerHTML += `<p>Average elapsed time: ${avgTime} ms</p>`;
+            resultsDiv.innerHTML += `<hr><h3>WebGL Average Results</h3>`;
+            resultsDiv.innerHTML += `<p><strong>Average Pi: ${avgPi.toFixed(6)}</strong></p>`;
+            resultsDiv.innerHTML += `<p><strong>Average Time: ${avgTime.toFixed(2)} ms</strong></p>`;
+            resultsDiv.innerHTML += `<p>Throughput: ${(totalIterations / avgTime / 1000).toFixed(2)} million iterations/sec</p>`;
             return;
         }
 
@@ -164,8 +166,7 @@ document.getElementById('start-button').addEventListener('click', () => {
                 totalPi += finalPi;
                 totalTime += elapsedTime;
 
-                resultsDiv.innerHTML += `<p>Pi: ${finalPi}</p>`;
-                resultsDiv.innerHTML += `<p>Elapsed time: ${elapsedTime} ms</p>`;
+                resultsDiv.innerHTML += `<p>Run ${b + 1}: Pi = ${finalPi.toFixed(6)}, Time = ${elapsedTime.toFixed(2)} ms</p>`;
 
                 runBenchmark(b + 1);
             }
@@ -175,4 +176,7 @@ document.getElementById('start-button').addEventListener('click', () => {
     }
 
     runBenchmark(0);
-});
+}
+
+// Export for use in HTML
+window.runWebGLBenchmark = runWebGLBenchmark;
