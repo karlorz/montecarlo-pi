@@ -1,6 +1,6 @@
 # Monte Carlo Pi Benchmark
 
-This project benchmarks the calculation of Pi using the Monte Carlo method across multiple platforms, with a focus on comparing performance between JavaScript, WebAssembly (Rust), and GPU (WebGL) implementations.
+This project benchmarks the calculation of Pi using the Monte Carlo method across multiple platforms, with a focus on comparing performance between JavaScript, WebAssembly (Rust), Go, and GPU (WebGL) implementations.
 
 ## 🌐 Live Demos (GitHub Pages)
 
@@ -30,13 +30,40 @@ See [Performance Analysis](#-performance-analysis) section for details.
 
 ## 📋 Overview
 
-This script benchmarks the calculation of Pi using the Monte Carlo method with multiprocessing.
+This project benchmarks the calculation of Pi using the Monte Carlo method with support for multiple programming languages and platforms:
+
+- **Go** (`benchmark-go/`) - Multi-threaded CLI using goroutines
+- **Rust** (`benchmark-rust-fast/`, `benchmark-rust-rand/`) - Native and WASM implementations
+- **JavaScript** (`benchmark-js.js`) - Node.js benchmark
+- **Python** (`app/python/`) - Multiprocessing implementation
+- **Web** (`app/pwa/`, `app/pwa-gpu/`, `app/pwa-wasm/`) - Browser-based benchmarks
+
+All CLI implementations share a consistent interface:
+- `-mmt` : Number of threads (default: 6)
+- `-ti` : Iterations as power of 10 (default: 7)
+- `-i` : Number of benchmark runs (default: 2)
+
+## 🚀 Quick Start
+
+```bash
+# Build and run Go benchmark
+make build-go
+make run-go
+
+# Or build all benchmarks
+make build-all
+
+# See all available commands
+make help
+```
 
 ## Prerequisites
 
-- Python 3.x
-- WSL2 on Windows 10
-- `argparse` and `multiprocessing` modules (included in the Python standard library)
+- **Go**: Go 1.21 or later
+- **Rust**: Rust toolchain (for Rust benchmarks)
+- **Node.js**: For JavaScript benchmarks
+- **Python 3.x**: For Python benchmarks
+- **Make**: For using the Makefile (optional but recommended)
 
 ## Running the Benchmark
 
@@ -232,7 +259,37 @@ Local benchmarks (Node.js for JS, native Rust) show the theoretical maximum perf
 
 ### Running Local Benchmarks
 
-Compare JavaScript, Rust (fastrand), and Rust (rand) implementations:
+Compare JavaScript, Rust (fastrand), Rust (rand), and Go implementations:
+
+#### Using Makefile (Recommended)
+
+```bash
+# Build Go benchmark
+make build-go
+
+# Run Go benchmark with defaults (6 threads, 10^7 iterations, 2 runs)
+make run-go
+
+# Run Go benchmark with custom settings
+make run-go THREADS=8 ITERATIONS=8 RUNS=5
+
+# Build all benchmarks
+make build-all
+
+# Run all benchmarks (JS, Rust, Go)
+make benchmark-all
+
+# Run quick test
+make test-go
+
+# Clean build artifacts
+make clean
+
+# Show all available commands
+make help
+```
+
+#### Direct Execution
 
 ```bash
 # Run all benchmarks (10^8 iterations, 5 runs each)
@@ -245,7 +302,33 @@ Compare JavaScript, Rust (fastrand), and Rust (rand) implementations:
 node benchmark-js.js 100000000 5
 cd benchmark-rust-fast && cargo run --release -- 100000000 5
 cd benchmark-rust-rand && cargo run --release -- 100000000 5
+cd benchmark-go && go run main.go -mmt 6 -ti 8 -i 5
 ```
+
+#### Go Benchmark CLI
+
+```bash
+# Build (production-optimized)
+cd benchmark-go
+CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o target/benchmark-go
+
+# Or use Makefile (recommended)
+make build-go
+
+# Run with defaults (6 threads, 10^7 iterations, 2 runs)
+./target/benchmark-go
+
+# Custom configuration
+./target/benchmark-go -mmt <threads> -ti <power_of_10> -i <benchmark_runs>
+
+# Example: 4 threads, 10^8 iterations, 3 runs
+./target/benchmark-go -mmt 4 -ti 8 -i 3
+```
+
+**Production build flags:**
+- `CGO_ENABLED=0` - Static binary with no external dependencies
+- `-ldflags="-s -w"` - Strip debug symbols (~33% size reduction)
+- `-trimpath` - Reproducible builds
 
 ### Key Lessons
 
