@@ -38,8 +38,8 @@ struct Params {
 }
 
 // Multi-bucket atomic counters to prevent u32 overflow
-// Capacity: 16 × 4.29B = 68.7B iterations
-const NUM_BUCKETS: u32 = 16u;
+// Capacity: 256 × 4.29B = 1.1 trillion iterations
+const NUM_BUCKETS: u32 = 256u;
 
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var<storage, read_write> results: array<atomic<u32>, NUM_BUCKETS>;
@@ -110,21 +110,39 @@ async function runWebGPUBenchmark() {
 
         // Configuration
         const workgroupSize = 64;
-        const numThreads = Math.min(65536, Math.ceil(totalIterations / 1000)); // Up to 64K threads
+        const numBuckets = 256; // Increased from 16 to 256 for better overflow protection
+        const maxDispatchSize = 65535; // WebGPU limit per dimension
+
+        // Calculate thread and workgroup configuration
+        const numThreads = Math.min(65536 * 256, Math.ceil(totalIterations / 1000)); // Support more threads
         const iterationsPerThread = Math.ceil(totalIterations / numThreads);
         const numWorkgroups = Math.ceil(numThreads / workgroupSize);
 
+        // Calculate 2D dispatch to handle workgroups > 65535
+        let dispatchX, dispatchY;
+        if (numWorkgroups <= maxDispatchSize) {
+            dispatchX = numWorkgroups;
+            dispatchY = 1;
+        } else {
+            // Use 2D grid layout
+            const sqrt = Math.ceil(Math.sqrt(numWorkgroups));
+            dispatchX = Math.min(sqrt, maxDispatchSize);
+            dispatchY = Math.min(Math.ceil(numWorkgroups / dispatchX), maxDispatchSize);
+        }
+        const actualWorkgroups = dispatchX * dispatchY;
+
         // Check for potential u32 overflow in atomic counter
-        // With 16 buckets: Max safe value is 16 × 4.29B = 68.7B iterations
-        // Since ~π/4 of iterations will be in circle, we need totalIterations * 0.785 < 68.7B
-        // This means totalIterations < ~87 billion is safe
-        const maxSafeIterations = 87000000000; // 87 billion
+        // With 256 buckets: Max safe value is 256 × 4.29B = 1.1 trillion iterations
+        // Since ~π/4 of iterations will be in circle, we need totalIterations * 0.785 < 1.1T
+        // This means totalIterations < ~1.4 trillion is safe
+        const maxSafeIterations = 1400000000000; // 1.4 trillion
         if (totalIterations > maxSafeIterations) {
             resultsDiv.innerHTML += `<p style="color: orange;">⚠️ Warning: ${totalIterations.toLocaleString()} iterations may cause overflow. Results may be inaccurate.</p>`;
-            resultsDiv.innerHTML += `<p style="color: orange;">Recommended maximum with 16-bucket implementation: ${maxSafeIterations.toLocaleString()} iterations</p>`;
+            resultsDiv.innerHTML += `<p style="color: orange;">Recommended maximum with 256-bucket implementation: ${maxSafeIterations.toLocaleString()} iterations</p>`;
         }
 
-        resultsDiv.innerHTML += `<p>Threads: ${numThreads}, Iterations/thread: ${iterationsPerThread}, Buckets: 16</p>`;
+        resultsDiv.innerHTML += `<p>Threads: ${numThreads}, Iterations/thread: ${iterationsPerThread}, Buckets: ${numBuckets}</p>`;
+        resultsDiv.innerHTML += `<p>Dispatch: ${dispatchX} × ${dispatchY} workgroups (${actualWorkgroups} total)</p>`;
 
         let totalPi = 0;
         let totalTime = 0;
@@ -139,12 +157,12 @@ async function runWebGPUBenchmark() {
             });
 
             const resultsBuffer = device.createBuffer({
-                size: 64, // 16 x u32 for multi-bucket atomics
+                size: 1024, // 256 x u32 for multi-bucket atomics
                 usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
             });
 
             const readBuffer = device.createBuffer({
-                size: 64, // 16 x u32
+                size: 1024, // 256 x u32
                 usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
             });
 
@@ -155,8 +173,8 @@ async function runWebGPUBenchmark() {
             ]);
             device.queue.writeBuffer(paramsBuffer, 0, paramsData);
 
-            // Initialize results buffer to 0 (all 16 buckets)
-            device.queue.writeBuffer(resultsBuffer, 0, new Uint32Array(16).fill(0));
+            // Initialize results buffer to 0 (all 256 buckets)
+            device.queue.writeBuffer(resultsBuffer, 0, new Uint32Array(256).fill(0));
 
             // Create bind group
             const bindGroup = device.createBindGroup({
@@ -172,11 +190,11 @@ async function runWebGPUBenchmark() {
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(pipeline);
             passEncoder.setBindGroup(0, bindGroup);
-            passEncoder.dispatchWorkgroups(numWorkgroups);
+            passEncoder.dispatchWorkgroups(dispatchX, dispatchY);
             passEncoder.end();
 
             // Copy results to read buffer
-            commandEncoder.copyBufferToBuffer(resultsBuffer, 0, readBuffer, 0, 64);
+            commandEncoder.copyBufferToBuffer(resultsBuffer, 0, readBuffer, 0, 1024);
 
             // Submit commands
             device.queue.submit([commandEncoder.finish()]);
@@ -185,15 +203,15 @@ async function runWebGPUBenchmark() {
             await readBuffer.mapAsync(GPUMapMode.READ);
             const resultData = new Uint32Array(readBuffer.getMappedRange());
 
-            // Sum all 16 buckets to get total inCircle count
+            // Sum all 256 buckets to get total inCircle count (use Number for large values)
             let inCircle = 0;
-            for (let i = 0; i < 16; i++) {
+            for (let i = 0; i < numBuckets; i++) {
                 inCircle += resultData[i];
             }
             readBuffer.unmap();
 
-            // Calculate Pi
-            const actualIterations = numThreads * iterationsPerThread;
+            // Calculate Pi - use actual workgroups dispatched which may be more than requested
+            const actualIterations = actualWorkgroups * workgroupSize * iterationsPerThread;
             const pi = (4.0 * inCircle) / actualIterations;
             const elapsedTime = performance.now() - startTime;
 

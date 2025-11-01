@@ -1,0 +1,16 @@
+[package]
+name = "montecarlo-pi-benchmark-gpu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wgpu = "22.1"
+pollster = "0.3"
+bytemuck = { version = "1.14", features = ["derive"] }
+rayon = "1.8"
+num_cpus = "1.16"
+fastrand = "2.0"
+
+[[bin]]
+name = "montecarlo-pi-benchmark-gpu"
+path = "src/main.rs"

@@ -39,10 +39,12 @@ Then open: http://localhost:8001
 ### WebGPU Implementation (New)
 - **Technology**: WebGPU Compute Shaders (WGSL)
 - **RNG**: PCG (Permuted Congruential Generator) - fast, high quality
-- **Architecture**: Up to 64K parallel threads, configurable iterations per thread
+- **Architecture**: Up to 16.7M parallel threads (65535 × 256), configurable iterations per thread
 - **Parallelism**: True GPGPU with 64-thread workgroups
+- **Overflow Protection**: 256-bucket atomic counters (supports up to 1.1 trillion iterations)
+- **Dispatch**: 2D grid layout to exceed 65,535 workgroup limit
 - **Optimizations**:
-  - Atomic operations for result aggregation
+  - Multi-bucket atomic operations for result aggregation
   - Asynchronous buffer mapping
   - No rendering pipeline overhead
   - Workgroup size: 64 (industry standard)
@@ -84,25 +86,34 @@ fn pcg_hash(input: u32) -> u32 {
     return (word >> 22u) ^ word;
 }
 
-// Parallel Monte Carlo with atomic aggregation
+// Parallel Monte Carlo with multi-bucket atomic aggregation
+// 256 buckets prevent u32 overflow at high iteration counts
+const NUM_BUCKETS: u32 = 256u;
+@group(0) @binding(1) var<storage, read_write> results: array<atomic<u32>, NUM_BUCKETS>;
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let thread_id = global_id.x;
+    let bucket = thread_id % NUM_BUCKETS;
     // ... Monte Carlo computation ...
-    atomicAdd(&results[0], in_circle);
+    atomicAdd(&results[bucket], in_circle);
 }
 ```
 
 ### Configuration
 
 - **Workgroup Size**: 64 threads (optimal for most GPUs)
-- **Max Threads**: 65,536 (GPU dependent)
+- **Max Threads**: ~16.7 million (65535 × 256 via 2D dispatch)
+- **Buckets**: 256 atomic u32 counters (prevents overflow up to 1.1 trillion iterations)
+- **Max Safe Iterations**: ~1.4 trillion (1.4 × 10^12)
 - **Iterations Distribution**: Dynamically calculated per thread
 
 ## 📈 Benchmark Settings
 
 - **Default Iterations**: 10^7 (10 million)
-- **Range**: 10^1 to 10^9
+- **Range**: 10^1 to 10^11 (100 billion)
 - **Benchmark Runs**: 3 (for averaging)
+- **WebGPU Max**: Up to 1.4 trillion iterations supported
 
 ## 🐛 Troubleshooting
 
@@ -121,6 +132,13 @@ Both implementations should converge to π ≈ 3.14159 with enough iterations. I
 - Check RNG quality (WebGPU should be better)
 - Increase iteration count
 - Run multiple benchmark iterations
+
+### Overflow at High Iterations (10^10+)
+If Pi is incorrect at very high iteration counts (e.g., showing ~1.4 instead of ~3.14):
+- This was fixed in 2025-11 with 256-bucket implementation
+- Supports up to ~1.4 trillion iterations
+- Clear cache and reload if using old version
+- Check browser console for overflow warnings
 
 ## 📝 Implementation Files
 
