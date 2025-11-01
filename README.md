@@ -328,11 +328,14 @@ fn calculate_pi_parallel(iterations: u64, threads: usize, run_seed: u64) -> f64 
 
 ## 📦 Binary Releases
 
-### Windows AMD64 Binary
-
-Pre-built Windows AMD64 Go binaries are automatically released via GitHub Actions.
+Pre-built Windows AMD64 binaries are automatically released via GitHub Actions.
 
 **Download:** [Releases page](https://github.com/karlorz/montecarlo-pi/releases)
+
+### Available Binaries
+
+#### Go CPU Benchmark (`benchmark-go-windows-amd64.exe`)
+Multi-threaded Go implementation with goroutines.
 
 **Usage:**
 ```cmd
@@ -343,17 +346,49 @@ benchmark-go-windows-amd64.exe
 benchmark-go-windows-amd64.exe -mmt 8 -ti 9 -i 3
 ```
 
-**Creating a Release:**
+#### Rust CPU Benchmark (`benchmark-rust-cpu-windows-amd64.exe`)
+High-performance multi-threaded Rust with Rayon and fastrand PRNG.
+
+**Usage:**
+```cmd
+# Run with defaults (10^8 iterations, 5 runs, auto-detect threads)
+benchmark-rust-cpu-windows-amd64.exe
+
+# Custom settings (10^9 iterations, 3 runs, 8 threads)
+benchmark-rust-cpu-windows-amd64.exe 9 3 8
+```
+
+#### Rust GPU Benchmark (`benchmark-rust-gpu-windows-amd64.exe`)
+GPU-accelerated using WebGPU with DirectX 12 backend. Auto-fallback to CPU if GPU unavailable.
+
+**Usage:**
+```cmd
+# Run with defaults (10^8 iterations, 5 runs)
+benchmark-rust-gpu-windows-amd64.exe
+
+# High precision (10^10 iterations, 3 runs)
+benchmark-rust-gpu-windows-amd64.exe 10 3
+
+# Extreme precision (10^11 iterations - GPU recommended)
+benchmark-rust-gpu-windows-amd64.exe 11 2
+```
+
+**GPU Requirements:**
+- Windows 10/11 with DirectX 12 support
+- NVIDIA GPU (GeForce GTX 900+), AMD GPU (Radeon RX 400+), or Intel Arc/11th gen integrated
+
+### Creating a Release
+
 ```bash
 # Tag a new version
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The GitHub Actions workflow automatically:
-1. Builds the Windows AMD64 binary
-2. Creates a GitHub release
-3. Attaches the binary to the release
+The GitHub Actions workflows automatically:
+1. Build Windows AMD64 binaries (Go, Rust CPU, Rust GPU)
+2. Create GitHub releases
+3. Attach binaries with detailed usage instructions
 
 ## 🚀 GitHub Pages Deployment
 

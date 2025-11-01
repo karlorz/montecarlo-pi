@@ -1,0 +1,167 @@
+name: Build and Release Rust Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write  # Required for creating releases
+
+jobs:
+  build-and-release:
+    name: Build Rust Binaries for Windows AMD64
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            benchmark-rust-fast/target/
+            benchmark-rust-gpu/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build Rust CPU (Fast) for Windows AMD64
+        run: |
+          cd benchmark-rust-fast
+          cargo build --release --target x86_64-pc-windows-msvc
+          mkdir -p ../release-artifacts
+          cp target/x86_64-pc-windows-msvc/release/montecarlo-pi-benchmark-fast.exe ../release-artifacts/benchmark-rust-cpu-windows-amd64.exe
+
+      - name: Build Rust GPU (WebGPU) for Windows AMD64
+        run: |
+          cd benchmark-rust-gpu
+          cargo build --release --target x86_64-pc-windows-msvc
+          cp target/x86_64-pc-windows-msvc/release/montecarlo-pi-benchmark-gpu.exe ../release-artifacts/benchmark-rust-gpu-windows-amd64.exe
+
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get binary sizes
+        id: binary_sizes
+        shell: bash
+        run: |
+          CPU_SIZE=$(du -h release-artifacts/benchmark-rust-cpu-windows-amd64.exe | cut -f1)
+          GPU_SIZE=$(du -h release-artifacts/benchmark-rust-gpu-windows-amd64.exe | cut -f1)
+          echo "CPU_SIZE=$CPU_SIZE" >> $GITHUB_OUTPUT
+          echo "GPU_SIZE=$GPU_SIZE" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            release-artifacts/benchmark-rust-cpu-windows-amd64.exe
+            release-artifacts/benchmark-rust-gpu-windows-amd64.exe
+          body: |
+            ## Monte Carlo Pi Benchmark - Rust Implementations
+
+            ### Windows AMD64 Binaries
+
+            Two high-performance Rust implementations for Windows:
+
+            #### 🚀 Rust CPU (benchmark-rust-cpu-windows-amd64.exe)
+            Multi-threaded CPU implementation using Rayon and fastrand PRNG.
+
+            **Usage:**
+            ```cmd
+            benchmark-rust-cpu-windows-amd64.exe <iterations_power> <runs> <threads>
+            ```
+
+            **Examples:**
+            ```cmd
+            REM Default: 10^8 iterations, 5 runs, auto-detect threads
+            benchmark-rust-cpu-windows-amd64.exe
+
+            REM Custom: 10^9 iterations, 3 runs, 8 threads
+            benchmark-rust-cpu-windows-amd64.exe 9 3 8
+            ```
+
+            #### 🎮 Rust GPU (benchmark-rust-gpu-windows-amd64.exe)
+            GPU-accelerated implementation using WebGPU (wgpu) with DirectX 12 backend.
+            Falls back to CPU if GPU is unavailable.
+
+            **Usage:**
+            ```cmd
+            benchmark-rust-gpu-windows-amd64.exe <iterations_power> <runs>
+            ```
+
+            **Examples:**
+            ```cmd
+            REM Default: 10^8 iterations, 5 runs
+            benchmark-rust-gpu-windows-amd64.exe
+
+            REM High precision: 10^10 iterations, 3 runs
+            benchmark-rust-gpu-windows-amd64.exe 10 3
+
+            REM Extreme: 10^11 iterations (GPU only, ~630ms on modern GPUs)
+            benchmark-rust-gpu-windows-amd64.exe 11 2
+            ```
+
+            **GPU Requirements:**
+            - Windows 10/11 with DirectX 12 support
+            - NVIDIA GPU (GeForce GTX 900 series or newer)
+            - AMD GPU (Radeon RX 400 series or newer)
+            - Intel GPU (Arc series or 11th gen integrated)
+
+            **Performance (Windows, NVIDIA RTX 3080):**
+            - CPU (16 threads): ~80ms for 10^9 iterations
+            - GPU: ~6ms for 10^9 iterations (~13x speedup)
+            - GPU: ~630ms for 10^11 iterations
+
+            **Features:**
+            - ✅ Multi-bucket overflow protection (supports up to 1.1 trillion iterations)
+            - ✅ 2D dispatch for workgroup limits
+            - ✅ Automatic CPU fallback
+            - ✅ Time-based random seeding
+
+            **Build information:**
+            - Version: ${{ steps.get_version.outputs.VERSION }}
+            - Rust toolchain: stable
+            - Target: x86_64-pc-windows-msvc
+            - CPU binary size: ${{ steps.binary_sizes.outputs.CPU_SIZE }}
+            - GPU binary size: ${{ steps.binary_sizes.outputs.GPU_SIZE }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload CPU artifact for manual builds
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-rust-cpu-windows-amd64
+          path: release-artifacts/benchmark-rust-cpu-windows-amd64.exe
+          retention-days: 30
+
+      - name: Upload GPU artifact for manual builds
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-rust-gpu-windows-amd64
+          path: release-artifacts/benchmark-rust-gpu-windows-amd64.exe
+          retention-days: 30

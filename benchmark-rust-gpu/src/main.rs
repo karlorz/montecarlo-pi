@@ -270,9 +270,15 @@ fn run_benchmark_gpu(gpu: &GpuContext, iterations: u64, runs: u32) {
     let mut times = Vec::with_capacity(runs as usize);
     let mut pi_values = Vec::with_capacity(runs as usize);
 
+    // Use time-based seed base for reproducibility across runs
+    let seed_base = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as u32;
+
     for run in 0..runs {
         let start = Instant::now();
-        let seed = (run as u32).wrapping_mul(100000);
+        let seed = seed_base.wrapping_add((run as u32).wrapping_mul(100000));
         let pi = gpu.calculate_pi_gpu(iterations, seed);
         let elapsed = start.elapsed();
 
@@ -306,9 +312,15 @@ fn run_benchmark_cpu(iterations: u64, runs: u32, threads: usize) {
     let mut times = Vec::with_capacity(runs as usize);
     let mut pi_values = Vec::with_capacity(runs as usize);
 
+    // Use time-based seed base for reproducibility across runs
+    let seed_base = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
     for run in 0..runs {
         let start = Instant::now();
-        let run_seed = (run as u64).wrapping_mul(100000);
+        let run_seed = seed_base.wrapping_add((run as u64).wrapping_mul(100000));
         let pi = calculate_pi_parallel_cpu(iterations, threads, run_seed);
         let elapsed = start.elapsed();
 
