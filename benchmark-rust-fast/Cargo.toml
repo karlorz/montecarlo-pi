@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 fastrand = "2.0"
+rayon = "1.10"
+num_cpus = "1.16"
 
 [profile.release]
 opt-level = 3

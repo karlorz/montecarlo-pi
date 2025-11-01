@@ -1,153 +1,355 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Code Agents when working with code in this repository.
 
 ## Project Overview
 
-This is a Monte Carlo Pi estimation benchmark project that implements the same algorithm across four different platforms:
-1. **Python backend** - Multiprocessing-based implementation
-2. **PWA (CPU)** - Progressive Web App using Web Workers for parallelization
-3. **PWA (GPU)** - Progressive Web App using WebGL shaders for GPU acceleration
-4. **PWA (WASM)** - Progressive Web App using Rust compiled to WebAssembly
+Monte Carlo Pi estimation benchmark suite comparing performance across multiple platforms and languages. All implementations use the Monte Carlo method: randomly generate points in a unit square and count how many fall inside a quarter circle to estimate π ≈ 4 × (points_in_circle / total_points).
 
-All three implementations use the Monte Carlo method: randomly generate points in a unit square and count how many fall inside a quarter circle to estimate π ≈ 4 × (points_in_circle / total_points).
+## Project Structure
 
-## Running the Implementations
-
-### Python Backend
-```sh
-# Build the Docker image
-docker build -t python-benchmark:latest -f app/python/Dockerfile ./app/python
-
-# Run with Docker
-docker run --rm -it python-benchmark:latest python benchmark.py -mmt 4 -i 2 -ti 7
-
-# Or use docker-compose (default: 4 threads, 1 iteration, 10^7 points)
-docker-compose -f docker-compose-py.yml up
-
-# Direct execution (no Docker)
-python3 app/python/benchmark.py -mmt 4 -i 2 -ti 7
+```
+montecarlo-pi/
+├── Makefile                    # Unified build system (RECOMMENDED)
+├── run-benchmarks.sh           # Automated benchmark comparison script
+├── benchmark-js.js             # Node.js benchmark (single-threaded)
+├── benchmark-go/               # Go multi-threaded CLI
+│   ├── main.go
+│   └── go.mod
+├── benchmark-rust-fast/        # Rust CLI with fastrand (WASM-native PRNG)
+│   ├── src/main.rs
+│   └── Cargo.toml
+├── benchmark-rust-rand/        # Rust CLI with rand (cryptographic RNG)
+│   ├── src/main.rs
+│   └── Cargo.toml
+└── app/
+    ├── python/                 # Python multiprocessing implementation
+    │   ├── benchmark.py
+    │   └── Dockerfile
+    ├── pwa/                    # PWA with Web Workers (CPU)
+    │   ├── index.html
+    │   ├── app.js
+    │   └── worker.js
+    ├── pwa-gpu/                # PWA with WebGL shaders (GPU)
+    │   ├── index.html
+    │   └── app.js
+    └── pwa-wasm/               # PWA with Rust→WASM (multi-threaded)
+        ├── index.html          # Multi-threaded version (default)
+        ├── index-st.html       # Single-threaded version
+        ├── src/lib.rs
+        ├── wasm-worker.js
+        └── Cargo.toml
 ```
 
-**Python CLI arguments:**
-- `-mmt`: Number of threads (defaults to CPU count)
-- `-i`: Number of benchmark iterations (default: 4)
-- `-ti`: Total iterations as power of 10 (default: 6, meaning 10^6 iterations)
+## Unified Parameter Interface (CLI Benchmarks)
 
-### PWA with Web Workers (CPU)
-```sh
-# Run with docker-compose (serves on port 8000)
-docker-compose -f docker-compose-pwa.yml up
+**All CLI implementations** (Go, Rust, Python) use consistent parameters:
 
-# Or use Python's built-in server
-python3 -m http.server 8000 --directory app/pwa
+- **THREADS** (`-mmt`): Number of parallel threads (default: 6 for Go/Python, auto-detect for Rust)
+- **ITERATIONS** (`-ti`): Power of 10 for total iterations (e.g., 8 = 10^8 = 100 million)
+- **RUNS** (`-i`): Number of benchmark runs to average (default: 2-5)
+
+## Quick Start (Makefile - Recommended)
+
+```bash
+# Build all CLI benchmarks
+make build-all
+
+# Run Go benchmark with defaults (6 threads, 10^8 iterations, 2 runs)
+make run-go
+
+# Run Rust (fastrand) with custom settings
+make run-rust THREADS=4 ITERATIONS=8 RUNS=3
+
+# Run all benchmarks (JS, Rust fast, Rust rand)
+make benchmark-all
+
+# Clean build artifacts
+make clean
+
+# See all available commands
+make help
 ```
-Access at http://localhost:8000
 
-**UI parameters:**
-- Number of Threads: How many Web Workers to spawn
-- Iterations (Power of 10): Total Monte Carlo iterations
-- Benchmark Iterations: How many times to repeat for averaging
+## Running Individual Implementations
 
-### PWA with WebGL (GPU)
-```sh
-# Run with docker-compose (serves on port 8001)
-docker-compose -f docker-compose-pwa-gpu.yml up
+### Go Benchmark (Multi-threaded CLI)
 
-# Or use Python's built-in server
-python3 -m http.server 8000 --directory app/pwa-gpu
+```bash
+# Build (production-optimized)
+make build-go
+
+# Run with custom parameters
+make run-go THREADS=4 ITERATIONS=8 RUNS=3
+
+# Direct execution
+cd benchmark-go
+./target/benchmark-go -mmt 4 -ti 8 -i 3
 ```
-Access at http://localhost:8001
 
-### PWA with WebAssembly (WASM)
-```sh
-# Build and run with docker-compose (serves on port 8002)
-docker-compose -f docker-compose-pwa-wasm.yml up
+**Build flags:** `CGO_ENABLED=0`, `-ldflags="-s -w"`, `-trimpath` for static binary
 
-# Or build manually and serve
-cd app/pwa-wasm
-./build.sh  # or: wasm-pack build --target web
-python3 -m http.server 8000
+### Rust Benchmarks (Native CLI)
+
+Both Rust implementations support parallel processing with Rayon:
+
+```bash
+# Build
+make build-rust-fast   # WASM-native fastrand PRNG
+make build-rust-rand   # Cryptographic rand PRNG
+
+# Run with consistent interface
+make run-rust THREADS=4 ITERATIONS=8 RUNS=3
+make run-rust-rand THREADS=6 ITERATIONS=9 RUNS=5
+
+# Arguments: <iterations_power> <runs> <threads>
+./benchmark-rust-fast/target/release/montecarlo-pi-benchmark-fast 8 5 6
+./benchmark-rust-rand/target/release/montecarlo-pi-benchmark-rand 8 5 6
 ```
-Access at http://localhost:8002 (Docker) or http://localhost:8000 (local)
 
-**Default**: Multi-threaded version with thread selector (1-16 threads)
-**Alternative**: Single-threaded version at `index-st.html`
-
-**Prerequisites for local build:**
-- Rust 1.70+
-- wasm-pack: `cargo install wasm-pack`
-
-## Architecture Details
-
-### Python Implementation (app/python/benchmark.py)
-- Uses `multiprocessing.Pool` to distribute work across CPU cores
-- Each worker process runs iterations independently with separate random seeds
-- The `TestMC` class encapsulates the parallel execution logic
-- Results are aggregated and averaged across benchmark iterations
-
-### PWA CPU Implementation (app/pwa/)
-- **app.js**: Main controller that spawns Web Workers and aggregates results
-- **worker.js**: Each worker performs Monte Carlo iterations independently
-- **index.html**: UI for configuring threads, iterations, and viewing results
-- Work distribution: `iterations / threads` per worker
-- Sequential benchmark runs to calculate averages
-
-### PWA GPU Implementation (app/pwa-gpu/)
-- **app.js**: Single-file implementation using WebGL for GPU computation
-- Uses fragment shaders to parallelize Monte Carlo sampling on the GPU
-- **RNG approach**: Custom pseudo-random generator using `fract(sin(seed + i) * 43758.5453123)`
-- Processes iterations in chunks (10^6 per chunk) using `requestAnimationFrame`
-- Reads results back from floating-point framebuffer for precision
-- Note: WebGL RNG quality is lower than CPU implementations, which may affect π accuracy
-
-### PWA WASM Implementation (app/pwa-wasm/)
-- **src/lib.rs**: Rust implementation compiled to WebAssembly
-- **Default (index.html)**: Multi-threaded version using Web Workers + WASM instances
-- **Alternative (index-st.html)**: Single-threaded version
-
-**CRITICAL PERFORMANCE FIXES (2025-10-15):**
-
-1. **Fix #1: WASM-Native PRNG (fastrand)**
-   - **Previous issue**: `getrandom` with `features = ["js"]` caused 200M WASM↔JS boundary crossings for 10^8 iterations
-   - **Impact**: Made WASM 20-50x SLOWER than pure JavaScript (catastrophic)
-   - **Solution**: Replaced with WASM-native `fastrand` PRNG (no JS calls)
-   - **Result**: 100-200x faster than old implementation
-
-2. **Fix #2: Worker Pool Pattern**
-   - **Previous issue**: Created new workers for EVERY benchmark run, each worker initializes WASM (~15-50ms per worker)
-   - **Impact**: With 8 threads × 2 runs, initialization overhead was 240-800ms (72-91% of total time!)
-   - **Solution**: Implemented `WorkerPool` class that creates workers once and reuses them across all benchmark runs
-   - **Result**: 1.5-2x speedup, initialization amortized as one-time cost
-
-**Combined Performance:**
-- Old WASM (with getrandom + disposable workers): 20-50 seconds for 10^8 iterations ❌
-- New WASM (with fastrand + worker pool): ~100-200ms for 10^8 iterations ⚡
-- Pure JavaScript: ~500-2000ms for 10^8 iterations
-- **Final: WASM now 2-10x faster than JavaScript** ✅
+**Key implementations:**
+- `benchmark-rust-fast/`: Uses `fastrand` (WASM-native, optimal for Monte Carlo)
+- `benchmark-rust-rand/`: Uses `rand::rngs::StdRng` (cryptographic quality, 15x slower)
 
 **Architecture:**
-- **Key functions**:
-  - `calculate_pi(iterations)`: Returns estimated Pi value directly (f64)
-  - `benchmark_pi(iterations, runs)`: Runs multiple iterations and returns averages
-- **wasm-worker.js**: Web Worker that loads WASM module once, sends ready signal when initialized
-- **WorkerPool class**: Manages persistent workers, waits for initialization before dispatching tasks
-- Compiled with aggressive optimizations (`opt-level = 3`, LTO, `codegen-units = 1`, `wasm-opt = ['-O3']`)
-- Benefits from near-native performance and type safety
-- Thread control: 1-16 threads configurable in UI
-- **WASM binary size**: ~45KB (optimized)
+- Rayon parallel iterators for multi-threading
+- Atomic counters for thread-safe aggregation
+- Per-run seeding to ensure varied results across benchmark runs
+- Thread pool initialized once per execution
 
-### Key Architectural Differences
-- **GPU version**: Processes work in fixed-size chunks asynchronously, parallelization handled by GPU
-- **CPU versions** (Python, PWA Workers, WASM Multi-threaded): Distribute iterations evenly across threads/workers
-- **WASM Single-threaded** (index-st.html): Runs on main thread with compiled performance, no parallelization
-- **WASM Multi-threaded** (default): Best of both worlds - compiled code + multi-core parallelization via Web Workers
+### JavaScript Benchmark (Node.js)
 
-## WSL2-Specific Setup (from README)
+```bash
+# Run with defaults (10^8 iterations, 5 runs)
+node benchmark-js.js
 
-If developing on Windows with WSL2:
+# Custom configuration
+node benchmark-js.js 100000000 5
+```
 
-```sh
+**Note:** Single-threaded, uses V8 JIT optimizations
+
+### Python Benchmark (Multiprocessing)
+
+```bash
+# Direct execution
+python3 app/python/benchmark.py -mmt 4 -i 2 -ti 7
+
+# Docker
+docker build -t python-benchmark:latest -f app/python/Dockerfile ./app/python
+docker run --rm -it python-benchmark:latest python benchmark.py -mmt 4 -i 2 -ti 7
+
+# Docker Compose
+docker-compose -f docker-compose-py.yml up
+```
+
+**Architecture:** Uses `multiprocessing.Pool` to distribute work across CPU cores
+
+### PWA with Web Workers (CPU)
+
+```bash
+# Serve with Docker Compose (port 8000)
+docker-compose -f docker-compose-pwa.yml up
+
+# Or use Python server
+python3 -m http.server 8000 --directory app/pwa
+```
+
+Access at http://localhost:8000
+
+**UI parameters:** Number of Threads, Iterations (Power of 10), Benchmark Iterations
+
+### PWA with WebGL (GPU)
+
+```bash
+# Serve with Docker Compose (port 8001)
+docker-compose -f docker-compose-pwa-gpu.yml up
+
+# Or use Python server
+python3 -m http.server 8000 --directory app/pwa-gpu
+```
+
+Access at http://localhost:8001
+
+**Note:** Uses fragment shaders for GPU parallelization. RNG quality is lower than CPU implementations.
+
+### PWA with WebAssembly (WASM)
+
+```bash
+# Build and serve with Docker Compose (port 8002)
+docker-compose -f docker-compose-pwa-wasm.yml up
+
+# Or build manually
+cd app/pwa-wasm
+./build.sh  # Requires Rust + wasm-pack
+python3 -m http.server 8000
+```
+
+Access at http://localhost:8002 (Docker) or http://localhost:8000 (local)
+
+**Versions:**
+- `index.html`: Multi-threaded (default, 1-16 threads)
+- `index-st.html`: Single-threaded
+
+**Prerequisites:** Rust 1.70+, wasm-pack (`cargo install wasm-pack`)
+
+## Critical Performance Optimizations (WASM)
+
+### Fix #1: WASM-Native PRNG (100-200x speedup)
+
+**Problem:** Using `getrandom` with `features = ["js"]` caused 200M WASM↔JS boundary crossings for 10^8 iterations (20-50 seconds overhead)
+
+**Solution:** Switched to WASM-native `fastrand` PRNG
+
+```toml
+# Cargo.toml - BEFORE (SLOW)
+getrandom = { version = "0.2", features = ["js"] }
+
+# Cargo.toml - AFTER (FAST)
+fastrand = "2.0"
+```
+
+### Fix #2: Worker Pool Pattern (1.5-2x speedup)
+
+**Problem:** Creating new workers for every benchmark run caused 240-800ms initialization overhead (72-91% of total time)
+
+**Solution:** Implemented `WorkerPool` class that creates workers once and reuses them
+
+**Architecture:**
+- Workers send ready signal after WASM initialization
+- Pool waits for all workers to be ready before dispatching tasks
+- Initialization cost amortized as one-time upfront cost
+
+## Performance Benchmarks
+
+### CLI Benchmarks (Native - 10^8 iterations, 4 threads)
+
+| Implementation | Avg Time | Speedup |
+|---------------|----------|---------|
+| **Rust (fastrand)** | **~20ms** | **6x faster** |
+| Go | ~125ms | 1.0x (baseline) |
+| Rust (rand) | ~43ms | 3x faster |
+| JavaScript (Node.js) | ~1000ms | 0.1x (single-threaded) |
+
+### WASM Browser (10^8 iterations)
+
+| Implementation | Time | vs JavaScript |
+|---------------|------|---------------|
+| **WASM (Optimized)** | **~100-200ms** | **2-10x faster** |
+| JavaScript (Web Workers) | ~500-2000ms | 1.0x (baseline) |
+| WASM (Old, unoptimized) | ~20-50 seconds | 20-50x slower |
+
+## Key Architectural Differences
+
+- **GPU version (WebGL):** Processes work in chunks asynchronously, parallelization handled by GPU
+- **CPU versions (Go, Rust, Python, PWA Workers):** Distribute iterations evenly across threads/workers
+- **WASM Multi-threaded:** Compiled Rust + multi-core via Web Workers + worker pool pattern
+- **WASM Single-threaded:** Runs on main thread, no parallelization
+
+## Seeding Strategy
+
+**Go implementation:**
+- Per-worker seed: `time.Now().UnixNano() + workerID * 1000000`
+- Uses `math/rand` with unique seeds per worker
+
+**Rust implementations:**
+- Per-run seed: `run * 100000 + timestamp_nanos`
+- Per-thread seed: `run_seed * 1000000 + thread_id`
+- Ensures varied results across benchmark runs while maintaining determinism within threads
+
+**WASM implementation:**
+- Uses `fastrand::seed()` with run-specific seeds
+- Avoids boundary crossings by using WASM-native RNG
+
+## Important Implementation Notes
+
+### Rust Parallel Processing
+
+Both `benchmark-rust-fast` and `benchmark-rust-rand` use Rayon for parallelization:
+
+```rust
+use rayon::prelude::*;
+
+fn calculate_pi_parallel(iterations: u64, threads: usize, run_seed: u64) -> f64 {
+    // Set global thread pool size once in main()
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build_global()
+        .unwrap();
+
+    // Parallel iteration with unique seeds per thread
+    (0..threads).into_par_iter().for_each(|thread_id| {
+        let seed = run_seed * 1000000 + thread_id;
+        // ... Monte Carlo iterations
+    });
+}
+```
+
+### Go Parallel Processing
+
+Uses goroutines with `sync.WaitGroup`:
+
+```go
+func runBenchmark(threads int, totalIterations int64) {
+    var wg sync.WaitGroup
+    results := make(chan int64, threads)
+
+    for i := 0; i < threads; i++ {
+        wg.Add(1)
+        go calculatePiWorker(iterationsPerThread, &wg, results)
+    }
+
+    wg.Wait()
+    // Aggregate results
+}
+```
+
+### WASM Worker Pool
+
+Persistent worker management to avoid initialization overhead:
+
+```javascript
+class WorkerPool {
+    constructor(numWorkers) {
+        this.workers = [];
+        // Create workers once
+        for (let i = 0; i < numWorkers; i++) {
+            const worker = new Worker('wasm-worker.js', { type: 'module' });
+            this.workers.push(worker);
+        }
+    }
+
+    async executeTask(iterations) {
+        // Reuse workers across benchmark runs
+        const promises = this.workers.map(worker =>
+            this.sendTask(worker, iterations)
+        );
+        return Promise.all(promises);
+    }
+}
+```
+
+## Known Issues & Lessons Learned
+
+### Resolved: WASM Performance Degradation (2025-10-15)
+
+**Root causes:**
+1. WASM↔JS boundary crossings are extremely expensive (~50-200ns per call)
+2. Worker initialization overhead dominates short computations
+3. `getrandom` with `features = ["js"]` calls back to JavaScript for every random number
+
+**Solutions:**
+1. Use WASM-native libraries (avoid JS dependencies in hot loops)
+2. Implement worker pooling for reusable workers
+3. Profile and measure - counterintuitive issues can arise in WASM
+
+### GPU Implementation Accuracy
+
+WebGL uses lower-quality RNG (`fract(sin(seed + i) * 43758.5453)`) compared to CPU implementations. This may affect π accuracy but provides significant GPU parallelization benefits.
+
+## WSL2 Development Setup
+
+```bash
 # Find WSL2 IP
 hostname -I
 
@@ -158,28 +360,35 @@ netsh interface portproxy add v4tov4 listenport=8000 listenaddress=0.0.0.0 conne
 netsh interface portproxy show all
 ```
 
-## Known Issues
+## GitHub Pages Deployment
 
-### Previous Performance Issue (RESOLVED 2025-10-15)
-The WASM implementation was catastrophically slow (20-50x slower than JavaScript) due to using `getrandom` crate with `features = ["js"]`, which caused 200 million WASM↔JS boundary crossings for random number generation. **This has been fixed by switching to `fastrand`, a WASM-native PRNG.**
+Live demos: https://karlorz.github.io/montecarlo-pi/
 
-### Accuracy Note
-The GPU implementation uses a lower-quality RNG (`fract(sin(seed + i) * 43758.5453123)`) compared to CPU implementations, which may affect π accuracy. The CPU and WASM implementations use high-quality PRNGs with good statistical properties.
+- **PWA (Web Workers):** `/app/pwa/`
+- **PWA (WebGL GPU):** `/app/pwa-gpu/`
+- **PWA (WebAssembly):** `/app/pwa-wasm/`
 
-## Performance Benchmarks (Local Native - 10^8 iterations)
+**Automated CI/CD:**
+- GitHub Actions builds WASM on every push to `main`
+- No compiled binaries committed to repository
+- Workflow: `.github/workflows/deploy.yml`
 
-Based on benchmark testing on 2025-10-15:
+## Testing & Validation
 
-| Implementation | Average Time | Speedup vs JS | Notes |
-|---------------|--------------|---------------|-------|
-| **Rust (fastrand)** | **76.28 ms** | **13.2x faster** | WASM-native PRNG, optimal for Monte Carlo |
-| JavaScript (Node.js) | 1004.49 ms | 1.0x (baseline) | V8 optimizations, Math.random() |
-| Rust (rand::thread_rng) | 1112.54 ms | 0.9x | Cryptographic-quality RNG (ChaCha20) |
+```bash
+# Quick test (Go)
+make test-go
 
-**Key Insights:**
-- Rust with `fastrand` provides 13x speedup over JavaScript for Monte Carlo simulations
-- WASM in browser should achieve similar performance (76-150ms expected)
-- Using cryptographic RNG adds ~15x overhead compared to fast PRNG
-- For Monte Carlo simulations, `fastrand` is the optimal choice
+# Run comprehensive benchmark suite
+make benchmark-all
 
-See `PERFORMANCE-ANALYSIS.md` for detailed analysis and `benchmark-*/` directories for reproducible benchmarks.
+# Custom benchmark comparison
+./run-benchmarks.sh 100000000 5
+```
+
+## References
+
+- [getrandom docs](https://docs.rs/getrandom/)
+- [fastrand docs](https://docs.rs/fastrand/)
+- [Rayon docs](https://docs.rs/rayon/)
+- [wasm-bindgen performance](https://rustwasm.github.io/docs/book/reference/code-size.html)

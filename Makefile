@@ -1,4 +1,4 @@
-.PHONY: help build-go build-rust-fast build-rust-rand build-all clean test-go run-go benchmark-all
+.PHONY: help build-go build-rust-fast build-rust-rand build-all clean test-go run-go run-rust run-rust-fast run-rust-rand benchmark-all
 
 # Default target
 help:
@@ -10,6 +10,9 @@ help:
 	@echo "  build-rust-rand   - Build Rust (rand) benchmark binary"
 	@echo "  build-all         - Build all benchmark binaries"
 	@echo "  run-go            - Run Go benchmark with default settings"
+	@echo "  run-rust          - Run Rust (fastrand) benchmark with default settings"
+	@echo "  run-rust-fast     - Run Rust (fastrand) benchmark"
+	@echo "  run-rust-rand     - Run Rust (rand) benchmark"
 	@echo "  test-go           - Run Go benchmark with test settings"
 	@echo "  benchmark-all     - Run all benchmarks (JS, Rust, Go)"
 	@echo "  clean             - Remove all build artifacts"
@@ -17,9 +20,13 @@ help:
 	@echo "Go benchmark usage:"
 	@echo "  make run-go THREADS=6 ITERATIONS=7 RUNS=2"
 	@echo ""
+	@echo "Rust benchmark usage:"
+	@echo "  make run-rust THREADS=6 ITERATIONS=8 RUNS=5"
+	@echo ""
 	@echo "Example:"
 	@echo "  make build-go"
 	@echo "  make run-go THREADS=4 ITERATIONS=8 RUNS=3"
+	@echo "  make run-rust THREADS=4 ITERATIONS=8 RUNS=3"
 
 # Go benchmark
 build-go:
@@ -30,7 +37,7 @@ build-go:
 
 run-go: build-go
 	@echo "🟢 Running Go benchmark..."
-	@cd benchmark-go && ./target/benchmark-go -mmt $(or $(THREADS),6) -ti $(or $(ITERATIONS),7) -i $(or $(RUNS),2)
+	@cd benchmark-go && ./target/benchmark-go -mmt $(or $(THREADS),6) -ti $(or $(ITERATIONS),8) -i $(or $(RUNS),2)
 
 test-go: build-go
 	@echo "🧪 Testing Go benchmark..."
@@ -46,6 +53,16 @@ build-rust-rand:
 	@echo "🔨 Building Rust (rand) benchmark..."
 	@cd benchmark-rust-rand && cargo build --release --quiet
 	@echo "✅ Rust (rand) benchmark built"
+
+run-rust: run-rust-fast
+
+run-rust-fast: build-rust-fast
+	@echo "🟢 Running Rust (fastrand) benchmark..."
+	@cd benchmark-rust-fast && ./target/release/montecarlo-pi-benchmark-fast $(or $(ITERATIONS),8) $(or $(RUNS),5) $(or $(THREADS),6)
+
+run-rust-rand: build-rust-rand
+	@echo "🟢 Running Rust (rand) benchmark..."
+	@cd benchmark-rust-rand && ./target/release/montecarlo-pi-benchmark-rand $(or $(ITERATIONS),8) $(or $(RUNS),5) $(or $(THREADS),6)
 
 # Build all
 build-all: build-go build-rust-fast build-rust-rand
